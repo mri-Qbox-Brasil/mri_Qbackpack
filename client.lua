@@ -42,7 +42,6 @@ if config.InvType == 'qb' then
     end)
 elseif config.InvType == 'ox' then
     RegisterNetEvent('yaldabotit-backpack:client:OpenBag', function(ItemID,ItemInfo)
-        Wait(1000)
         exports[config.InvName]:openInventory('stash', 'Backpack'..tostring(ItemID))
     end)
 end

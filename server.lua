@@ -22,7 +22,7 @@ if config.InvType == 'qb' then
             if not item.info.id then
                 local Player = QBCore.Functions.GetPlayer(source)
                 local newitem = Player.PlayerData.items[item.slot]
-                newitem.info.id = GenerateID() 
+                newitem.info.id = GenerateID()
                 exports[config.InvName]:SetInventory(source,Player.PlayerData.items)
                 TriggerClientEvent('yaldabotit-backpack:client:OpenBag',source,newitem.info.id,i)
             else
@@ -34,7 +34,7 @@ elseif config.InvType == 'ox' then
     for i = 1,#config.Bags,1 do
         QBCore.Functions.CreateUseableItem(config.Bags[i].Item, function(source,item)
             if not item.metadata.id then
-                item.metadata.id = GenerateID() 
+                item.metadata.id = GenerateID()
                 exports[config.InvName]:SetMetadata(source, item.slot, item.metadata)
             end
             exports[config.InvName]:RegisterStash('Backpack'..tostring(item.metadata.id),'Mochila', config.Bags[i].Slots, config.Bags[i].InsideWeight)
@@ -56,7 +56,7 @@ elseif config.InvType == 'ox' then
             '^Backpack[%w]+',
         }
     })
-    
+
     local count = 0
     function countBackpacks()
         count = 0
@@ -70,6 +70,6 @@ elseif config.InvType == 'ox' then
 
     AddEventHandler('onServerResourceStop', function(resourceName)
         if resourceName ~= GetCurrentResourceName() then return end
-        ox_inventory:removeHooks()
+        exports.ox_inventory:removeHooks()
     end)
 end

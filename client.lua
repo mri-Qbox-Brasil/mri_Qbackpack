@@ -16,14 +16,15 @@ end
 local function ItemCheck()
     local PlayerPed = PlayerPedId()
     local PlayerGender = GenderCheck()
-    for i = 1,#config.Bags,1 do
+    local CurrentBag = nil
+
+    for i = 1, #config.Bags, 1 do
         if QBCore.Functions.HasItem(config.Bags[i].Item) then
             CurrentBag = i
             break
-        else
-            CurrentBag = nil
         end
     end
+
     if CurrentBag ~= nil then
         if PlayerGender == 'male' then
             SetPedComponentVariation(PlayerPed, 5, config.Bags[CurrentBag].ClothingMaleID, config.Bags[CurrentBag].MaleTextureID, 0)
@@ -31,9 +32,23 @@ local function ItemCheck()
             SetPedComponentVariation(PlayerPed, 5, config.Bags[CurrentBag].ClothingFemaleID, config.Bags[CurrentBag].FemaleTextureID, 0)
         end
     else
-        SetPedComponentVariation(PlayerPed, 5, 0, 0, 0)
+        local CurrentDrawable, CurrentTexture = GetPedDrawableVariation(PlayerPed, 5), GetPedTextureVariation(PlayerPed, 5)
+        local shouldReset = false
+
+        for i = 1, #config.Bags, 1 do
+            if (PlayerGender == 'male' and CurrentDrawable == config.Bags[i].ClothingMaleID and CurrentTexture == config.Bags[i].MaleTextureID) or
+               (PlayerGender == 'female' and CurrentDrawable == config.Bags[i].ClothingFemaleID and CurrentTexture == config.Bags[i].FemaleTextureID) then
+                shouldReset = true
+                break
+            end
+        end
+
+        if shouldReset then
+            SetPedComponentVariation(PlayerPed, 5, 0, 0, 0)
+        end
     end
 end
+
 
 if config.InvType == 'qb' then
     RegisterNetEvent('yaldabotit-backpack:client:OpenBag', function(ItemID,ItemInfo)

@@ -1,13 +1,20 @@
-fx_version 'cerulean'
-games {'gta5'}
-lua54 'yes'
-author 'yaldabotit'
-description '[QB] yaldabotit Backpack'
-version '1.0.0'
-support_discord 'https://discord.gg/VZ5YVh9fxC'
+fx_version "cerulean"
+game "gta5"
+lua54 "yes"
+use_experimental_fxv2_oal "yes"
 
- 
-shared_script "config.lua"
-client_script "client.lua"
-server_script "server.lua"
+description "REPO_DESCRIPTION"
+author "MRI QBOX Team"
+version "MRIQBOX_VERSION"
 
+shared_scripts {
+    "shared/*.lua"
+}
+
+client_scripts {
+    "client/*.lua"
+}
+
+server_scripts {
+    "server/*.lua"
+}

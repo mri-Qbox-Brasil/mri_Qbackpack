@@ -1,14 +1,10 @@
 QBCore = exports[config.FrameworkResource]:GetCoreObject()
 
-
 local function GenderCheck()
     local PlayerPed = PlayerPedId()
-    if IsPedModel(PlayerPed,"mp_m_freemode_01") then
-        gender = 'male'
-    elseif IsPedModel(PlayerPed,"mp_f_freemode_01") then
-        gender = 'female'
-    else
-        gender = 'custom'
+    if IsPedModel(PlayerPed,"mp_m_freemode_01") then return 'male'
+    elseif IsPedModel(PlayerPed,"mp_f_freemode_01") then return 'female'
+    else return 'custom'
     end
     return(gender)
 end
@@ -74,4 +70,5 @@ AddEventHandler('onResourceStop', function(resource)
         Wait(1000)
         ItemCheck()
 	end
+
 end)

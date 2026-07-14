@@ -1,116 +1,154 @@
-# mri_Qbackpack - Manual Funcional
+# mri_Qbackpack — Manual
 
-Sistema de mochilas/bags para FiveM com equipamento visual no ped e inventário stash dedicado. Compatível com QB-inventory, LJ-inventory e ox_inventory.
+Sistema de mochilas: aplica o componente visual no ped de quem possui o item e dá a cada mochila um stash persistente próprio.
 
-## O que o recurso faz
+---
 
-O mri_Qbackpack gerencia mochilas no jogo, aplicando automaticamente o componente visual (prop) no ped do jogador quando ele possui o item no inventário, e criando um inventário stash dedicado e persistente para cada mochila, permitindo armazenar itens dentro da mochila equipada.
+## Sumário
 
-## Funcionalidades principais
+1. [Dependências](#dependências)
+2. [Instalação](#instalação)
+3. [Configuração](#configuração)
+4. [Mochilas (`config.Bags`)](#mochilas-configbags)
+5. [Itens no inventário](#itens-no-inventário)
+6. [Funcionamento](#funcionamento)
+7. [Integrações](#integrações)
+8. [Entrypoints para outros recursos](#entrypoints-para-outros-recursos)
+9. [Estrutura de arquivos](#estrutura-de-arquivos)
 
-- **Equipamento visual automático**: Aplica componente de mochila no ped do jogador quando ele possui o item no inventário
-- **Detecção de gênero**: Aplica variações corretas de clothing para peds masculinos e femininos
-- **Stash persistente por mochila**: Cada mochila ganha um inventário único com ID próprio, slots e peso configuráveis
-- **Suporte dual-inventory**: Funciona com QB-inventory/LJ-inventory (`"qb"`) e ox_inventory (`"ox"`)
-- **Prevenção de dupes**: Hook `swapItems` no ox_inventory impede mover itens de mochila para dentro da própria mochila
-- **IDs únicos persistentes**: Cada mochila recebe um ID de 10 dígitos gerado automaticamente, persistido em `IdList.json`
+---
 
-## Como funciona
+## Dependências
 
-### Fluxo de equipamento visual
-1. Ao carregar o jogador (`OnPlayerLoaded`), o cliente verifica se ele possui algum item de mochila no inventário
-2. Se possuir, o componente de mochila (slot 5) é aplicado ao ped com as variações corretas de gênero
-3. Se trocar de mochila, a anterior é removida automaticamente antes de aplicar a nova
-4. O check é re-executado em `OnPlayerLoaded`, `SetPlayerData` e `onResourceStart`
+| Recurso | Obrigatório | Observação |
+|---|---|---|
+| `qb-core` / `qbx_core` | Sim | O nome exato é lido de `config.FrameworkResource`. O recurso usa `GetCoreObject`, `QBCore.Functions.HasItem` e `QBCore.Functions.CreateUseableItem` |
+| `ox_inventory` | Sim (modo `ox`) | Modo padrão. Usa `openInventory`, `RegisterStash`, `SetMetadata`, `Search`, `registerHook` |
+| `qb-inventory` / `lj-inventory` | Sim (modo `qb`) | Alternativa ao modo `ox`. Usa `inventory:server:OpenInventory` e `SetInventory` |
 
-### Fluxo de uso da mochila
-1. O jogador usa o item de mochila no inventário (`UseableItem`)
-2. **Primeiro uso**: um ID único é gerado e atribuído ao item
-3. Um stash com nome `Backpack<id>` é criado/aberto com os slots e peso configurados
-4. Usos subsequentes reabrem o mesmo stash pelo ID persistente
+Não há bloco `dependencies` no `fxmanifest.lua` — a ordem de start precisa ser garantida pelo `server.cfg`.
 
-### Prevenção de dupes (ox_inventory)
-Um hook `swapItems` é registrado para impedir que itens de mochila (`backpack1`, `backpack2`, `duffle1`) sejam movidos para dentro de qualquer stash que corresponda ao padrão `^Backpack[%w]+`.
+---
 
-## Configurações disponíveis (shared/config.lua)
+## Instalação
 
-### Configurações gerais
-| Opção | Padrão | Descrição |
-|-------|---------|-----------|
-| `config.FrameworkResource` | `"qb-core"` | Nome do resource do framework (QBCore) |
-| `config.InvType` | `"ox"` | Tipo de inventory: `"qb"` ou `"ox"` |
-| `config.InvName` | `"ox_inventory"` | Nome do resource de inventory instalado |
+1. Copie a pasta `mri_Qbackpack` para `resources/`.
+2. Adicione ao `server.cfg`, depois do framework e do inventário:
+   ```
+   ensure mri_Qbackpack
+   ```
+3. Cadastre os itens `backpack1`, `backpack2` e `duffle1` no seu inventário (veja [Itens no inventário](#itens-no-inventário)).
+4. Ajuste `shared/config.lua` para o inventário que você usa (`config.InvType` / `config.InvName`).
+5. Se usar `ox_inventory` com `qb-core`, aplique o patch de `HasItem` descrito em [Integrações](#integrações) — sem ele o componente visual nunca é aplicado.
 
-### Definição de mochilas (config.Bags)
-Cada mochila é definida com:
+O arquivo `IdList.json` na raiz do recurso guarda os IDs de mochila já emitidos e é reescrito em runtime pelo servidor. **Não apague esse arquivo** — perder o conteúdo permite que um ID seja reemitido e duas mochilas passem a compartilhar o mesmo stash.
 
-| Campo | Exemplo | Descrição |
-|-------|---------|-----------|
-| `ComponentId` | `5` | Slot do componente GTA (5 = mochila/paraquedas) |
-| `ClothingMaleID` | `82` | Drawable ID para peds masculinos |
-| `MaleTextureID` | `0` | Texture variant para masculinos |
-| `ClothingFemaleID` | `82` | Drawable ID para peds femininos |
-| `FemaleTextureID` | `0` | Texture variant para femininos |
-| `InsideWeight` | `100000` | Peso máximo da mochila em gramas |
-| `Slots` | `15` | Número de slots no inventário da mochila |
-| `Item` | `"backpack1"` | Nome do item no inventory |
+---
 
-### Mochilas pré-configuradas
-| Item | Slots | Peso | Drawable M | Texture M | Drawable F | Texture F |
-|------|-------|------|------------|-----------|------------|-----------|
-| `backpack1` | 15 | 100kg | 82 | 0 | 82 | 0 |
-| `backpack2` | 20 | 200kg | 82 | 6 | 82 | 6 |
-| `duffle1` | 20 | 200kg | 82 | 4 | 0 | 0 |
+## Configuração
 
-## Eventos
+Arquivo: `shared/config.lua`.
 
-### Server → Client
-| Evento | Payload | Descrição |
-|--------|---------|-----------|
-| `mri_Qbackpack:client:OpenBag` | `(ItemID, ItemInfo)` | Abre o inventário stash da mochila |
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `config.FrameworkResource` | string | Sim | Nome do recurso do framework de onde o `GetCoreObject` é chamado. Padrão: `qb-core` |
+| `config.InvType` | string | Sim | Tipo de inventário: `ox` ou `qb`. Define qual bloco de código é registrado no client e no server. Padrão: `ox` |
+| `config.InvName` | string | Sim | Nome do recurso de inventário instalado (`ox_inventory`, `qb-inventory`, `lj-inventory`…). Padrão: `ox_inventory` |
+| `config.Bags` | array | Sim | Lista de mochilas. Uma entrada por item de mochila — ver tabela abaixo |
 
-### Client (ouvidos)
-| Evento | Origem | Descrição |
-|--------|--------|-----------|
-| `QBCore:Client:OnPlayerLoaded` | qb-core/qbx_core | Dispara verificação visual da mochila no login |
-| `QBCore:Player:SetPlayerData` | qb-core/qbx_core | Dispara verificação visual ao alterar dados |
+---
 
-## Itens necessários (inventory)
+## Mochilas (`config.Bags`)
 
-Defina os seguintes itens no seu inventory:
+Cada entrada define um item de mochila, o visual que ele aplica no ped e o tamanho do stash que ele abre.
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `ComponentId` | number | Não | Slot de componente do GTA V. Padrão quando omitido: `5` (mochila/paraquedas) |
+| `ClothingMaleID` | number | Sim | Drawable aplicado em `mp_m_freemode_01` |
+| `MaleTextureID` | number | Sim | Variação de textura para o modelo masculino |
+| `ClothingFemaleID` | number | Sim | Drawable aplicado em `mp_f_freemode_01` |
+| `FemaleTextureID` | number | Sim | Variação de textura para o modelo feminino |
+| `InsideWeight` | number | Sim | Peso máximo do stash, em gramas |
+| `Slots` | number | Sim | Número de slots do stash |
+| `Item` | string | Sim | Nome do item no inventário. É esse nome que vira item usável |
+
+Mochilas que já vêm no config:
+
+| Item | Slots | Peso | Drawable/Textura M | Drawable/Textura F |
+|---|---|---|---|---|
+| `backpack1` | 15 | 100 kg | 82 / 0 | 82 / 0 |
+| `backpack2` | 20 | 200 kg | 82 / 6 | 82 / 6 |
+| `duffle1` | 20 | 200 kg | 82 / 4 | 82 / 0 |
+
+> Ao adicionar uma mochila nova, inclua o nome do item também no `itemFilter` do hook `swapItems` em `server/server.lua` — a lista lá é hardcoded (`backpack1`, `backpack2`, `duffle1`) e não é derivada do `config.Bags`. Sem isso, a nova mochila pode ser guardada dentro de outra mochila.
+
+---
+
+## Itens no inventário
+
+Os itens precisam existir no seu inventário com exatamente os nomes definidos em `config.Bags[i].Item`. Exemplo para `ox_inventory` (`data/items.lua`):
 
 ```lua
 ['backpack1'] = {
     label = 'Mochila Pequena',
     weight = 1000,
-    type = 'item',
-    image = 'backpack1.png',
-    description = 'Uma mochila pequena com 15 slots',
+    stack = false,
+    close = true,
 },
 ['backpack2'] = {
     label = 'Mochila Grande',
     weight = 1500,
-    type = 'item',
-    image = 'backpack2.png',
-    description = 'Uma mochila grande com 20 slots',
+    stack = false,
+    close = true,
 },
 ['duffle1'] = {
     label = 'Bolsa Esportiva',
     weight = 800,
-    type = 'item',
-    image = 'duffle1.png',
-    description = 'Uma bolsa esportiva com 20 slots',
+    stack = false,
+    close = true,
 },
 ```
 
-## Integração com outros recursos MRI
+Os itens **não devem ser empilháveis** (`stack = false`): o ID do stash é gravado na metadata da instância do item, e stacks fazem duas mochilas dividirem a mesma metadata.
 
-### Obrigatórias
-- `qb-core` ou `qbx_core` — Framework principal
-- `qb-inventory` / `lj-inventory` / `ox_inventory` — Sistema de inventário
+---
 
-### Compatibilidade com ox_inventory
-Para tornar `QBCore.Functions.HasItem` compatível com ox_inventory, aplique este patch em `qb-core/client/functions.lua`:
+## Funcionamento
+
+### Componente visual
+
+`client/client.lua` roda a checagem `ItemCheck` em três momentos: `QBCore:Client:OnPlayerLoaded`, `QBCore:Player:SetPlayerData` e `onResourceStart` (todos com 1s de espera). A checagem:
+
+1. Detecta o gênero pelo modelo do ped (`mp_m_freemode_01` → `Male`, `mp_f_freemode_01` → `Female`, qualquer outro → `custom`).
+2. Se o ped já estiver com o drawable/textura de alguma mochila do config, limpa o componente.
+3. Se o jogador possuir algum item de mochila (`QBCore.Functions.HasItem`), aplica o drawable/textura correspondente ao gênero.
+
+Peds com modelo customizado retornam `custom` e **não recebem o componente visual** — a função sai antes de aplicar.
+
+### Stash da mochila
+
+Cada item de `config.Bags` é registrado como usável no servidor. Ao usar o item:
+
+1. Se o item ainda não tem `id` na metadata (modo `ox`) ou em `info` (modo `qb`), o servidor gera um número aleatório de 10 dígitos, checa contra `IdList.json`, grava no arquivo e grava no item.
+2. No modo `ox`, o stash `Backpack<id>` é registrado com os `Slots` e `InsideWeight` da mochila e o client chama `openInventory('stash', 'Backpack<id>')`.
+3. No modo `qb`, o client dispara `inventory:server:OpenInventory` com o stash `Backpack<id>`, passando `maxweight` e `slots`.
+
+O ID acompanha a instância do item, então a mochila mantém o conteúdo ao ser trocada entre jogadores.
+
+### Anti-dupe (somente modo `ox`)
+
+Um hook `swapItems` do `ox_inventory` bloqueia (`return false`) qualquer movimentação dos itens `backpack1`, `backpack2` e `duffle1` para inventários que casem com `^Backpack[%w]+` — ou seja, impede guardar mochila dentro de mochila, que é o vetor clássico de dupe. Os hooks são removidos em `onServerResourceStop`.
+
+---
+
+## Integrações
+
+### ox_inventory
+
+Modo padrão (`config.InvType = "ox"`). Ativa o registro dinâmico de stash via `RegisterStash`, a gravação do ID em metadata via `SetMetadata` e o hook anti-dupe `swapItems`.
+
+Se o seu framework for o `qb-core` original rodando com `ox_inventory`, a função `QBCore.Functions.HasItem` consulta o inventário do qb e sempre retorna falso. Aplique este patch em `qb-core/client/functions.lua` para que o componente visual da mochila funcione:
 
 ```lua
 function QBCore.Functions.HasItem(items, amount)
@@ -118,9 +156,7 @@ function QBCore.Functions.HasItem(items, amount)
     local count = exports.ox_inventory:Search('count', items)
     if type(items) == 'table' and type(count) == 'table' then
         for _, v in pairs(count) do
-            if v < amount then
-                return false
-            end
+            if v < amount then return false end
         end
         return true
     end
@@ -128,44 +164,44 @@ function QBCore.Functions.HasItem(items, amount)
 end
 ```
 
-## Exemplos práticos
+O `qbx_core` já resolve `HasItem` pelo `ox_inventory` e dispensa o patch.
 
-### Adicionar nova mochila
+### qb-inventory / lj-inventory
+
+Modo `config.InvType = "qb"`. O stash é aberto pelo evento `inventory:server:OpenInventory` com `maxweight` e `slots` passados na hora, e o ID é gravado em `item.info.id` via `SetInventory`. O hook anti-dupe **não existe** nesse modo.
+
+---
+
+## Entrypoints para outros recursos
+
+### Evento `mri_Qbackpack:client:OpenBag`
+
+Evento de rede server → client que abre o stash de uma mochila. É o único ponto de entrada exposto pelo recurso.
+
 ```lua
--- shared/config.lua
-config.Bags = {
-    -- mochilas existentes...
-    {
-        ComponentId = 5,
-        ClothingMaleID = 84,
-        MaleTextureID = 0,
-        ClothingFemaleID = 84,
-        FemaleTextureID = 0,
-        InsideWeight = 150000,
-        Slots = 25,
-        Item = "backpack3",
-    },
-}
+-- server
+TriggerClientEvent('mri_Qbackpack:client:OpenBag', source, backpackId, bagIndex)
 ```
 
-### Verificar se jogador tem mochila equipada
-```lua
-if QBCore.Functions.HasItem('backpack1') then
-    -- jogador tem mochila pequena
-end
+| Argumento | Tipo | Descrição |
+|---|---|---|
+| `backpackId` | number | ID de 10 dígitos da mochila (define o nome do stash: `Backpack<id>`) |
+| `bagIndex` | number | Índice da mochila em `config.Bags` — usado no modo `qb` para resolver `Slots` e `InsideWeight` |
+
+O recurso não expõe exports.
+
+---
+
+## Estrutura de arquivos
+
 ```
-
-### Abrir stash manualmente (server)
-```lua
-TriggerClientEvent('mri_Qbackpack:client:OpenBag', source, ItemID, ItemInfo)
+mri_Qbackpack/
+├── client/
+│   └── client.lua        — detecção de gênero, aplicação do componente visual, abertura do stash
+├── server/
+│   └── server.lua        — itens usáveis, geração de ID, RegisterStash, hook anti-dupe swapItems
+├── shared/
+│   └── config.lua        — framework, tipo de inventário e lista de mochilas
+├── IdList.json           — IDs de mochila já emitidos (escrito em runtime; não apagar)
+└── fxmanifest.lua
 ```
-
-## Solução de problemas
-
-- **Mochila visual não aparece**: Verifique se o item está no inventário e se o ped é `mp_m_freemode_01` ou `mp_f_freemode_01`
-- **Gênero não detecta**: Detecção funciona apenas com modelos padrão; peds customizados retornam `"custom"` e não recebem mochila
-- **Stash não abre**: Confirme que o ID foi gerado e salvo em `IdList.json`
-- **Dupes de itens**: Hook `swapItems` no ox_inventory impede movimento para dentro da própria mochila
-- **IDs perdidos**: Não delete o arquivo `IdList.json` — ele persiste os IDs entre restarts
-- **Itens hardcodados no hook**: No modo `ox`, o hook usa nomes hardcodados; idealmente deveria derivar do config
-- **Inventário não sincroniza**: Verifique se `config.InvType` e `config.InvName` estão corretos
